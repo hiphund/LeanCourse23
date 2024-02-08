@@ -12,19 +12,21 @@ open BigOperators Function Ideal Polynomial Classical Matrix
 noncomputable section
 set_option linter.unusedVariables false
 local macro_rules | `($x ^ $y) => `(HPow.hPow $x $y)
-set_option maxHeartbeats 20000000
+set_option maxHeartbeats 20000000 -- at some point some strategies didnt work anymore without increasing the maxHeartbeats
 
-@[ext] structure circle_with_radius :=
+-- Everything proven, except for the fact that the constructible numbers are the smallest subfield of ℂ closed under square roots (but i have proven that they are closed under square roots!)
+
+structure circle_with_radius := -- Own definition of a circle, because only unit circle is defined in mathlib
 (center : ℂ)
 (radius : ℝ)
 
 def circle_with_radius.points (c : circle_with_radius) : Set ℂ :=
   {z | Complex.abs (z - c.center) = c.radius}
 
-@[ext] structure line_through_two_points :=
+ structure line_through_two_points :=
 (z₁ z₂ : ℂ)
 
-def line_through_two_points.points (l : line_through_two_points) : Set ℂ :=
+def line_through_two_points.points (l : line_through_two_points) : Set ℂ := --lines defined through affine combination
   { (t : ℂ) * l.z₁ + (1-t) * l.z₂ | (t : ℝ) }
 
 lemma line_through_two_points_beginn_in_points (l : line_through_two_points) : l.z₁ ∈ l.points := by{
@@ -51,17 +53,17 @@ def line_circle_intersection (l : line_through_two_points) (c : circle_with_radi
 
 def circle_circle_intersection (c₁ c₂ : circle_with_radius)  : Set ℂ :=
   { z | z ∈ c₁.points ∩ c₂.points }
-
+-- Just there to abbrieviate the next definition
 def intersections (M : Set ℂ) (lines : Set line_through_two_points) (circles : Set circle_with_radius) : Set ℂ :=
-  let line_intersections := ⋃(l₁ ∈ lines) (l₂ ∈ lines) (h: l₁.points ≠ l₂.points), line_line_intersection l₁ l₂
+  let line_intersections := ⋃(l₁ ∈ lines) (l₂ ∈ lines) (h: l₁.points ≠ l₂.points), line_line_intersection l₁ l₂ --note that for lines the .points condition is importatn but not für circles, because they are uniquely defined by their center and radius
   let line_circle_intersections := ⋃(l ∈ lines) (c ∈ circles), line_circle_intersection l c
   let circle_intersections := ⋃(c₁ ∈ circles) (c₂ ∈ circles) (h: c₁ ≠ c₂) , circle_circle_intersection c₁ c₂
   line_intersections ∪ line_circle_intersections ∪ circle_intersections
 
-def constructible_numbers_rec (M: Set ℂ) (h0 : 0 ∈M) (h1 : 1 ∈ M ) : Nat → Set ℂ
+def constructible_numbers_rec (M: Set ℂ) (h0 : 0 ∈M) (h1 : 1 ∈ M ) : Nat → Set ℂ --recursively define the constructible numbers until the n-th step
   | 0   => M
   | n+1 => constructible_numbers_rec M (h0) (h1) n ∪ intersections (constructible_numbers_rec M h0 h1 n) (constructible_lines (constructible_numbers_rec M (h0) (h1) n)) (constructible_circles (constructible_numbers_rec M (h0) (h1) n))
-
+-- useful lemma
 lemma constructible_numbers_rec_element_of (M: Set ℂ) (h0 : 0 ∈M) (h1 : 1 ∈ M ) (n : ℕ) (m : ℕ ) (hm : m ≥ n) (z : ℂ) (hz : z ∈ constructible_numbers_rec M (h0) (h1) n) : z ∈ constructible_numbers_rec M (h0) (h1) (m) := by{
   induction m
   case zero =>
@@ -85,7 +87,7 @@ lemma constructible_numbers_rec_zero (M: Set ℂ) (h0 : 0 ∈M) (h1 : 1 ∈ M ) 
 lemma constructible_numbers_rec_one (M: Set ℂ) (h0 : 0 ∈M) (h1 : 1 ∈ M ) : 1 ∈ constructible_numbers_rec M (h0) (h1) 0 := by{
   exact h1
 }
-
+-- useful lemma
 @[simp] lemma constructible_numbers_mono (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ M) (n m : ℕ) (h : n ≤ m) : constructible_numbers_rec M (h0) (h1) n ⊆ constructible_numbers_rec M (h0) (h1) m := by{
   intro z hz
   induction m
@@ -102,10 +104,10 @@ lemma constructible_numbers_rec_one (M: Set ℂ) (h0 : 0 ∈M) (h1 : 1 ∈ M ) :
       rw [h2] at hz
       assumption
 }
-
+-- define the constructible numbers as the union of the constructible numbers at each step
 def constructible_numbers (M : Set ℂ) (h0: 0 ∈ M) (h1: 1 ∈ M) : Set ℂ :=
     ⋃(n : ℕ), constructible_numbers_rec M (h0) (h1) n
-
+-- useful lemma
 lemma subset_constructible_numbers (M : Set ℂ) (h0: 0 ∈ M ) (h1 : 1 ∈ M): M ⊆ constructible_numbers M (h0) (h1) := by{
   intro z hz
   have h1 : constructible_numbers_rec M (h0) (h1) 0 ⊆ constructible_numbers M (h0) (h1) := by{
@@ -119,7 +121,8 @@ lemma constructible_numbers_rec_subset_constructible_numbers (M : Set ℂ) (h0: 
   apply Set.subset_sUnion_of_mem
   use n
 }
-
+-- following 3 lemma are extremly useful
+-- i didn't find a way to minimize the amount used "max"
 lemma element_circle_circle_intersection_constructible (M : Set ℂ) (h0: 0 ∈ M) (h1: 1 ∈ M) (c₁ c₂ : circle_with_radius) (hc₁: c₁ ∈ constructible_circles (constructible_numbers M h0 h1)) (hc₂: c₂ ∈ constructible_circles (constructible_numbers M h0 h1)) (hcc: c₁ ≠ c₂ ) (z : ℂ) (hz : z ∈ circle_circle_intersection c₁ c₂) : z ∈ constructible_numbers M (h0) (h1) := by{
   obtain⟨p1, a1, b1, hc1, hp1, ha1, hb1⟩ := hc₁
   obtain⟨p2, a2, b2, hc2, hp2, ha2, hb2⟩ := hc₂
@@ -386,9 +389,6 @@ lemma constructible_numbers_element_of (M : Set ℂ) (h0: 0 ∈ M) (h1: 1 ∈ M)
 
 theorem constructible_numbers_closed_addition (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ M)
 (a b : ℂ) (ha: a ∈ constructible_numbers M (h0) (h1)) (hb: b ∈ constructible_numbers M (h0) (h1)): (a + b : ℂ) ∈ constructible_numbers M (h0) (h1) := by{
- by_cases h₀ : b = 0
- simp [h₀]
- exact ha
  by_cases h : a ≠ b
  ·let c1 : circle_with_radius := {center := b, radius := Complex.abs (a)}
   let c2 : circle_with_radius := {center := a, radius := Complex.abs (b)}
@@ -434,7 +434,6 @@ theorem constructible_numbers_closed_addition (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1
        calc Complex.abs (a + b - a) = Complex.abs b := by simp
        _= c2.radius := by exact rfl
   }
-
   exact element_circle_circle_intersection_constructible M h0 h1 c1 c2 h2 h3 (hcc) (a + b) h1'
  · push_neg at h
    let l : line_through_two_points := {z₁ := 0, z₂ := a}
@@ -567,7 +566,7 @@ lemma constructible_numbers_closed_complex_conjugation (M : Set ℂ) (h0: 0∈M)
     exact element_circle_circle_intersection_constructible M h0 h1 C1 C2 hC1 hC2 hcc ⟨ z.re,-z.im ⟩ hz2
 }
 
-lemma constructible_numbers_contains_I (M : Set ℂ) (h0: 0 ∈ M) (h1: 1 ∈ M) : (⟨0, 1⟩ : ℂ) ∈ constructible_numbers M (h0) (h1) := by{
+lemma constructible_numbers_contains_I (M : Set ℂ) (h0: 0 ∈ M) (h1: 1 ∈ M) : (Complex.I : ℂ) ∈ constructible_numbers M (h0) (h1) := by{
   have ha : -1 ∈ constructible_numbers M h0 h1 := by{
     exact constructible_numbers_additive_inverse M h0 h1 1 (constructible_numbers_element_of M h0 h1 1 h1)
   }
@@ -610,8 +609,7 @@ lemma constructible_numbers_contains_I (M : Set ℂ) (h0: 0 ∈ M) (h1: 1 ∈ M)
       _= Complex.abs ⟨-1, Real.sqrt 3⟩ := by ring
       _= Real.sqrt ((-1)*(-1) + Real.sqrt 3 * Real.sqrt 3) := by exact rfl
       _= Real.sqrt (1 + 3) := by norm_num
-      _= Real.sqrt 4 := by ring
-      _= Real.sqrt (2*2) := by norm_num
+      _= Real.sqrt (2*2) := by ring
       _= 2 := by exact Real.sqrt_mul_self (by norm_num)
       _= C1.radius := by exact rfl
 
@@ -623,10 +621,7 @@ lemma constructible_numbers_contains_I (M : Set ℂ) (h0: 0 ∈ M) (h1: 1 ∈ M)
       _= Real.sqrt (1 + 3) := by norm_num
       _= Real.sqrt 4 := by ring
       _= Real.sqrt (2*2) := by norm_num
-      _= 2 := by{
-        have : (0 : ℝ ) ≤ (2 :ℝ ) := by norm_num
-        exact Real.sqrt_mul_self this
-      }
+      _= 2 := by exact Real.sqrt_mul_self (by norm_num)
       _= C2.radius := by exact rfl
   }
 
@@ -636,7 +631,6 @@ lemma constructible_numbers_contains_I (M : Set ℂ) (h0: 0 ∈ M) (h1: 1 ∈ M)
 
   let L1 : line_through_two_points := {z₁ := z₁, z₂ := 0}
   let C3 : circle_with_radius := {center := 0, radius := 1}
-  let I : ℂ := ⟨0, 1⟩
   have hL : L1 ∈ constructible_lines (constructible_numbers M (h0) (h1)) := by{
     use z₁
     use 0
@@ -657,12 +651,11 @@ lemma constructible_numbers_contains_I (M : Set ℂ) (h0: 0 ∈ M) (h1: 1 ∈ M)
       · exact constructible_numbers_element_of M h0 h1 0 h0
   }
 
-  have hI₁ : I ∈ L1.points ∩ C3.points := by{
+  have hI₁ : Complex.I ∈ L1.points ∩ C3.points := by{
     constructor
     · use (1 / Real.sqrt 3)
       calc (1 / Real.sqrt 3 : ℝ ) * L1.z₁ + (1 - (1 / Real.sqrt 3 : ℝ ) ) * L1.z₂ = (1 / Real.sqrt 3 : ℝ ) * z₁ + (1 - (1 / Real.sqrt 3 : ℝ ) ) * 0 := by exact rfl
       _= (1 / Real.sqrt 3) * z₁ + (1 / Real.sqrt 3) * 0 := by norm_num
-      _= (1 / Real.sqrt 3) * z₁ + 0 := by ring
       _= (1 / Real.sqrt 3) * z₁ := by ring
       _= (1 / Real.sqrt 3) * ⟨0, Real.sqrt 3⟩ := by exact rfl
       _= ⟨(1 / Real.sqrt 3) * 0, (1 / Real.sqrt 3) * Real.sqrt 3⟩ := by {
@@ -672,16 +665,15 @@ lemma constructible_numbers_contains_I (M : Set ℂ) (h0: 0 ∈ M) (h1: 1 ∈ M)
         · simp
       }
       _= ⟨0, 1⟩ := by norm_num
-      _= I := by exact rfl
-    · calc Complex.abs (I - 0) = Complex.abs (⟨0, 1⟩ - ⟨0,0⟩) := by exact rfl
+      _= Complex.I := by exact rfl
+    · calc Complex.abs (Complex.I - 0) = Complex.abs (⟨0, 1⟩ - ⟨0,0⟩) := by exact rfl
       _= Complex.abs ⟨0-0, 1-0⟩ := by exact rfl
       _= Complex.abs ⟨0, 1⟩ := by ring
       _= Real.sqrt (0*0 + 1*1) := by exact rfl
-      _= Real.sqrt (1) := by norm_num
       _= 1 := by norm_num
       _= C3.radius := by exact rfl
   }
-  exact element_line_circle_intersection_constructible M h0 h1 L1 C3 hL hC3 ⟨0, 1⟩ hI₁
+  exact element_line_circle_intersection_constructible M h0 h1 L1 C3 hL hC3 Complex.I hI₁
 }
 
 lemma constructible_numbers_half_point (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ M) (z₁ z₂ : ℂ) (hz₁ : z₁ ∈ constructible_numbers M (h0) (h1)) (hz₂ : z₂ ∈ constructible_numbers M (h0) (h1))  : (z₁ + z₂) / 2 ∈ constructible_numbers M (h0) (h1) := by{
@@ -711,7 +703,7 @@ lemma constructible_numbers_half_point (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ M)
     push_neg
     exact h'
   }
-  have hh: Real.sqrt ((1/(2*2)) + (Real.sqrt (3) * Real.sqrt (3) / (2 * 2))) = 1 := by{
+  have hh: Real.sqrt ((1/(2*2)) + (Real.sqrt (3) * Real.sqrt (3) / (2 * 2))) = 1 := by{  --useful for many simplifications later
    calc Real.sqrt ((1/(2*2)) + (Real.sqrt (3) * Real.sqrt (3) / (2 * 2))) =Real.sqrt (1/4 + 3/4):= by norm_num
    _= Real.sqrt (1) := by norm_num
    _= 1 := by simp
@@ -728,17 +720,14 @@ lemma constructible_numbers_half_point (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ M)
       · calc Complex.abs (s₁ - z₁) = Complex.abs (⟨x,y₁⟩ - ⟨z₁.re, z₁.im⟩) := by exact rfl
         _= Complex.abs ⟨x - z₁.re, y₁ - z₁.im⟩ := by exact rfl
         _= Complex.abs ⟨(z₁.re + z₂.re) / 2 - z₁.re, 1 / 2 * Real.sqrt (3) * (z₁.re - z₂.re) + z₁.im - z₁.im⟩ := by exact rfl
-        _= Complex.abs ⟨(z₁.re + z₂.re) / 2 - z₁.re, 1 / 2 * Real.sqrt (3) * (z₁.re - z₂.re)⟩ := by ring
         _= Complex.abs ⟨( z₂.re - z₁.re) / 2, - 1 / 2 * Real.sqrt (3) * (z₂.re - z₁.re)⟩ := by ring
         _= Real.sqrt (((z₂.re - z₁.re) / 2)*((z₂.re - z₁.re) / 2) + (- 1 / 2 * Real.sqrt (3) * (z₂.re - z₁.re))*(- 1 / 2 * Real.sqrt (3) * (z₂.re - z₁.re))) := by exact rfl
-        _= Real.sqrt ((z₂.re - z₁.re) * (z₂.re -z₁.re) * (1 / (2*2) + (- 1 / 2 * Real.sqrt (3)) * (- 1 / 2 * Real.sqrt (3)))) := by ring
         _= Real.sqrt ((z₂.re - z₁.re) * (z₂.re -z₁.re) * (1 / (2*2) + ( 1 / 2 * Real.sqrt (3)) * ( 1 / 2 * Real.sqrt (3)))) := by ring
         _= Real.sqrt ((z₂.re - z₁.re) * (z₂.re -z₁.re)) * Real.sqrt (1 / (2*2) + (1 / 2 * Real.sqrt (3)) * ( 1 / 2 * Real.sqrt (3))) := by {
           exact Real.sqrt_mul (mul_self_nonneg (z₂.re - z₁.re)) (1 / (2*2) + (1 / 2 * Real.sqrt (3)) * ( 1 / 2 * Real.sqrt (3)))
         }
         _= Real.sqrt ((z₂.re - z₁.re) * (z₂.re -z₁.re)) * Real.sqrt (1 / (2*2) + (Real.sqrt (3) * Real.sqrt (3)) / (2*2) ) := by ring
         _= Real.sqrt ((z₂.re - z₁.re) * (z₂.re -z₁.re)) * 1 := by rw[hh]
-        _= Real.sqrt ((z₂.re - z₁.re) * (z₂.re -z₁.re)) := by simp
         _= Real.sqrt ((z₂.re - z₁.re) * (z₂.re -z₁.re) + 0) := by ring
         _= Real.sqrt ((z₂.re - z₁.re) * (z₂.re -z₁.re) + (z₂.im - z₁.im) * (z₂.im - z₁.im)) := by {
           have : z₂.im - z₁.im = 0 := by {
@@ -756,14 +745,12 @@ lemma constructible_numbers_half_point (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ M)
         _= Complex.abs ⟨x - z₂.re, y₁ - z₂.im⟩ := by exact rfl
         _= Complex.abs ⟨(z₁.re + z₂.re) / 2 - z₂.re, 1 / 2 * Real.sqrt (3) * (z₁.re - z₂.re) + z₁.im - z₂.im⟩ := by exact rfl
         _= Complex.abs ⟨(z₁.re + z₂.re) / 2 - z₂.re, 1 / 2 * Real.sqrt (3) * (z₁.re - z₂.re) + z₁.im - z₁.im⟩ := by rw[h]
-        _= Complex.abs ⟨(z₁.re + z₂.re) / 2 - z₂.re, 1 / 2 * Real.sqrt (3) * (z₁.re - z₂.re)⟩ := by ring
         _= Complex.abs ⟨( z₁.re - z₂.re) / 2, 1 / 2 * Real.sqrt (3) * (z₁.re - z₂.re)⟩ := by ring
         _= Real.sqrt (((z₁.re - z₂.re) / 2)*((z₁.re - z₂.re) / 2) + (1 / 2 * Real.sqrt (3) * (z₁.re - z₂.re))*(1 / 2 * Real.sqrt (3) * (z₁.re - z₂.re))) := by exact rfl
         _= Real.sqrt ((z₁.re - z₂.re) * (z₁.re -z₂.re) * (1 / (2*2) + (1 / 2 * Real.sqrt (3)) * (1 / 2 * Real.sqrt (3)))) := by ring
         _= Real.sqrt ((z₁.re - z₂.re) * (z₁.re -z₂.re)) * Real.sqrt (1 / (2*2) + ( 1 / 2 * Real.sqrt (3)) * ( 1 / 2 * Real.sqrt (3))) := by {
           exact Real.sqrt_mul (mul_self_nonneg (z₁.re - z₂.re)) (1 / (2*2) + ( 1 / 2 * Real.sqrt (3)) * ( 1 / 2 * Real.sqrt (3)))
         }
-        _= Real.sqrt ((z₁.re - z₂.re) * (z₁.re -z₂.re)) * Real.sqrt (1 / (2*2) + (1 / 2 * Real.sqrt (3)) * ( 1 / 2 * Real.sqrt (3))) := by ring
         _= Real.sqrt ((z₁.re - z₂.re) * (z₁.re -z₂.re)) * Real.sqrt (1 / (2*2) + (Real.sqrt (3) * Real.sqrt (3)) / (2 *2 )) := by ring
         _= Real.sqrt ((z₁.re - z₂.re) * (z₁.re -z₂.re)) * 1 := by rw[hh]
         _= Real.sqrt ((z₁.re - z₂.re) * (z₁.re -z₂.re)) := by simp
@@ -791,15 +778,12 @@ lemma constructible_numbers_half_point (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ M)
       · calc Complex.abs (s₂ - z₁) = Complex.abs (⟨x,y₂⟩ - ⟨z₁.re, z₁.im⟩) := by exact rfl
         _= Complex.abs ⟨x - z₁.re, y₂ - z₁.im⟩ := by exact rfl
         _= Complex.abs ⟨(z₁.re + z₂.re) / 2 - z₁.re, - 1 / 2 * Real.sqrt (3) * (z₁.re - z₂.re) + z₁.im - z₁.im⟩ := by exact rfl
-        _= Complex.abs ⟨(z₁.re + z₂.re) / 2 - z₁.re, - 1 / 2 * Real.sqrt (3) * (z₁.re - z₂.re)⟩ := by ring
         _= Complex.abs ⟨( z₂.re - z₁.re) / 2, 1 / 2 * Real.sqrt (3) * (z₂.re - z₁.re)⟩ := by ring
         _= Real.sqrt (((z₂.re - z₁.re) / 2)*((z₂.re - z₁.re) / 2) + (1 / 2 * Real.sqrt (3) * (z₂.re - z₁.re))*(1 / 2 * Real.sqrt (3) * (z₂.re - z₁.re))) := by exact rfl
-        _= Real.sqrt ((z₂.re - z₁.re) * (z₂.re -z₁.re) * (1 / (2*2) + (1 / 2 * Real.sqrt (3)) * (1 / 2 * Real.sqrt (3)))) := by ring
         _= Real.sqrt ((z₂.re - z₁.re) * (z₂.re -z₁.re) * (1 / (2*2) + (- 1 / 2 * Real.sqrt (3)) * (- 1 / 2 * Real.sqrt (3)))) := by ring
         _= Real.sqrt ((z₂.re - z₁.re) * (z₂.re -z₁.re)) * Real.sqrt (1 / (2*2) + (- 1 / 2 * Real.sqrt (3)) * (- 1 / 2 * Real.sqrt (3))) := by {
           exact Real.sqrt_mul (mul_self_nonneg (z₂.re - z₁.re)) (1 / (2*2) + (- 1 / 2 * Real.sqrt (3)) * (- 1 / 2 * Real.sqrt (3)))
         }
-        _= Real.sqrt ((z₂.re - z₁.re) * (z₂.re -z₁.re)) * Real.sqrt (1 / (2*2) + (1 / 2 * Real.sqrt (3)) * ( 1 / 2 * Real.sqrt (3))) := by ring
         _= Real.sqrt ((z₂.re - z₁.re) * (z₂.re -z₁.re)) * Real.sqrt (1 / (2*2) + (Real.sqrt (3) * Real.sqrt (3)) / (2 *2)) := by ring
         _= Real.sqrt ((z₂.re - z₁.re) * (z₂.re -z₁.re)) * 1 := by rw[hh]
         _= Real.sqrt ((z₂.re - z₁.re) * (z₂.re -z₁.re)) := by simp
@@ -820,10 +804,8 @@ lemma constructible_numbers_half_point (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ M)
         _= Complex.abs ⟨x - z₂.re, y₂ - z₂.im⟩ := by exact rfl
         _= Complex.abs ⟨(z₁.re + z₂.re) / 2 - z₂.re, - 1 / 2 * Real.sqrt (3) * (z₁.re - z₂.re) + z₁.im - z₂.im⟩ := by exact rfl
         _= Complex.abs ⟨(z₁.re + z₂.re) / 2 - z₂.re, - 1 / 2 * Real.sqrt (3) * (z₁.re - z₂.re) + z₁.im - z₁.im⟩ := by rw[h]
-        _= Complex.abs ⟨(z₁.re + z₂.re) / 2 - z₂.re, - 1 / 2 * Real.sqrt (3) * (z₁.re - z₂.re)⟩ := by ring
         _= Complex.abs ⟨( z₁.re - z₂.re) / 2, - 1 / 2 * Real.sqrt (3) * (z₁.re - z₂.re)⟩ := by ring
         _= Real.sqrt (((z₁.re - z₂.re) / 2)*((z₁.re - z₂.re) / 2) + (- 1 / 2 * Real.sqrt (3) * (z₁.re - z₂.re))*(- 1 / 2 * Real.sqrt (3) * (z₁.re - z₂.re))) := by exact rfl
-        _= Real.sqrt ((z₁.re - z₂.re) * (z₁.re -z₂.re) * (1 / (2*2) + (- 1 / 2 * Real.sqrt (3)) * (- 1 / 2 * Real.sqrt (3)))) := by ring
         _= Real.sqrt ((z₁.re - z₂.re) * (z₁.re -z₂.re) * (1 / (2*2) + ( 1 / 2 * Real.sqrt (3)) * ( 1 / 2 * Real.sqrt (3)))) := by ring
         _= Real.sqrt ((z₁.re - z₂.re) * (z₁.re -z₂.re)) * Real.sqrt (1 / (2*2) + (1 / 2 * Real.sqrt (3)) * ( 1 / 2 * Real.sqrt (3)) ) := by {
           exact Real.sqrt_mul (mul_self_nonneg (z₁.re - z₂.re)) (1 / (2*2) + (1 / 2 * Real.sqrt (3)) * ( 1 / 2 * Real.sqrt (3)))
@@ -900,8 +882,6 @@ lemma constructible_numbers_half_point (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ M)
         _= ⟨(1 / 2 : ℝ ) * x + (1 / 2 : ℝ ) * x, (1 / 2 : ℝ ) * y₁ + (1 / 2 : ℝ ) * y₂⟩ := by exact rfl
         _= ⟨x, (1 / 2 ) * (y₁ + y₂)⟩ := by ring
         _= ⟨(z₁.re + z₂.re) / 2, (1 / 2 ) * ( (1 / 2 * Real.sqrt (3) * (z₁.re - z₂.re) + z₁.im) + (- 1 / 2 * Real.sqrt (3) * (z₁.re - z₂.re) + z₁.im))⟩ := by exact rfl
-        _= ⟨(z₁.re + z₂.re) / 2, (1/2) * ( z₁.im + z₁.im)⟩ := by ring
-        _= ⟨(z₁.re + z₂.re) / 2, (z₁.im + z₁.im ) / 2 ⟩ := by ring
         _=  ⟨1/2 * (z₁.re + z₂.re), 1/2 *(z₁.im + z₁.im)⟩:= by ring
         _=  ⟨1/2 * (z₁.re + z₂.re), 1/2 *(z₁.im + z₂.im)⟩:= by rw[h]
         _=  ⟨(1/2 : ℝ)  * (z₁.re + z₂.re), (1/2 : ℝ ) *(z₁.im + z₂.im)⟩:= by simp
@@ -919,7 +899,6 @@ lemma constructible_numbers_half_point (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ M)
       · use 1/2
         calc (1/2 : ℝ ) * L2.z₁ + (1 - (1/2 : ℝ ) ) * L2.z₂ = (1/2) * z₁ + (1 - (1/2)) * z₂ := by simp
         _= (1/2) * z₁ + (1/2) * z₂ := by norm_num
-        _= (1/2) *(z₁ + z₂) := by ring
         _= (z₁ + z₂) / 2 := by ring
 
 
@@ -940,11 +919,8 @@ lemma constructible_numbers_half_point (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ M)
       · calc Complex.abs (s₁ - z₁) = Complex.abs (⟨x₁,y₁⟩ - ⟨z₁.re, z₁.im⟩) := by exact rfl
         _= Complex.abs ⟨x₁ - z₁.re, y₁ - z₁.im⟩ := by exact rfl
         _= Complex.abs ⟨(1/2) * (z₁.re + z₂.re - Real.sqrt (3) * (z₁.im -z₂.im)) - z₁.re, (1/ 2) * ((z₁.re - z₂.re) * Real.sqrt (3) + (z₁.im + z₂.im)) - z₁.im⟩ := by exact rfl
-        _= Complex.abs ⟨(1/2) * z₁.re + (1/2) * z₂.re - (1/2) * Real.sqrt (3) * (z₁.im -z₂.im) - z₁.re, (1/ 2) * (z₁.re - z₂.re) * Real.sqrt (3) + (1/2) * z₁.im + (1/2) * z₂.im - z₁.im⟩ := by ring
-        _= Complex.abs ⟨(1/2 - 1) * z₁.re + (1/2) * z₂.re - (1/2) * Real.sqrt (3) * (z₁.im - z₂.im), (1/2) * (z₁.re - z₂.re) * Real.sqrt (3) + (1/2) * z₂.im + (1/2 - 1) * z₁.im⟩ := by ring
         _= Complex.abs ⟨(1/2) * (z₂.re - z₁.re) + (1/2) * Real.sqrt (3) * (z₂.im - z₁.im), -(1/2) * (z₂.re - z₁.re) * Real.sqrt (3) + (1/2) * (z₂.im -  z₁.im)⟩ := by ring
         _= Real.sqrt (((1/2) * (z₂.re - z₁.re) + (1/2) * Real.sqrt (3) * (z₂.im - z₁.im))*((1/2) * (z₂.re - z₁.re) + (1/2) * Real.sqrt (3) * (z₂.im - z₁.im)) + (-(1/2) * (z₂.re - z₁.re) * Real.sqrt (3) + (1/2) * (z₂.im -  z₁.im))*(-(1/2) * (z₂.re - z₁.re) * Real.sqrt (3) + (1/2) * (z₂.im -  z₁.im))) := by exact rfl
-        _= Real.sqrt (((1/2) * (1/2) * ((z₂.re - z₁.re) + Real.sqrt (3) * (z₂.im - z₁.im))*((z₂.re - z₁.re) +  Real.sqrt (3) * (z₂.im - z₁.im)) + (1/2) * (1/2) * (- (z₂.re - z₁.re) * Real.sqrt (3) +  (z₂.im -  z₁.im))*(-(z₂.re - z₁.re) * Real.sqrt (3) + (z₂.im - z₁.im)))) := by ring
         _= Real.sqrt (((1/2) * (1/2) * (((z₂.re - z₁.re) + Real.sqrt (3) * (z₂.im - z₁.im))*((z₂.re - z₁.re) +  Real.sqrt (3) * (z₂.im - z₁.im)) + (- (z₂.re - z₁.re) * Real.sqrt (3) +  (z₂.im -  z₁.im))*(-(z₂.re - z₁.re) * Real.sqrt (3) + (z₂.im - z₁.im))))) := by ring
         _= Real.sqrt ((1/2) * (1/2)) * Real.sqrt (((z₂.re - z₁.re) + (Real.sqrt (3) * (z₂.im - z₁.im)))*((z₂.re - z₁.re) +  (Real.sqrt (3) * (z₂.im - z₁.im))) + ((- (z₂.re - z₁.re) * Real.sqrt (3)) +  (z₂.im -  z₁.im))*((-(z₂.re - z₁.re) * Real.sqrt (3)) + (z₂.im - z₁.im))) := by{
           exact Real.sqrt_mul (mul_self_nonneg (1/2)) (((z₂.re - z₁.re) + (Real.sqrt (3) * (z₂.im - z₁.im)))*((z₂.re - z₁.re) +  (Real.sqrt (3) * (z₂.im - z₁.im))) + ((- (z₂.re - z₁.re) * Real.sqrt (3)) +  (z₂.im -  z₁.im))*((-(z₂.re - z₁.re) * Real.sqrt (3)) + (z₂.im - z₁.im)))
@@ -952,8 +928,6 @@ lemma constructible_numbers_half_point (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ M)
         _= Real.sqrt ((1/2) * (1/2)) * Real.sqrt ((a + b)*(a + b) + (c + d)*(c + d)) := by exact rfl
         _= Real.sqrt ((1/2) * (1/2)) * Real.sqrt (a*a + 2*a*b + b*b + c*c + 2*c*d + d*d) := by ring
         _= Real.sqrt ((1/2) * (1/2)) * Real.sqrt ((z₂.re - z₁.re) * (z₂.re - z₁.re) + 2* (z₂.re - z₁.re) * ( Real.sqrt (3) * (z₂.im - z₁.im)) + ( Real.sqrt (3) * (z₂.im - z₁.im)) * ( Real.sqrt (3) * (z₂.im - z₁.im)) + (- (z₂.re - z₁.re) * Real.sqrt (3)) * (- (z₂.re - z₁.re) * Real.sqrt (3)) + 2* (- (z₂.re - z₁.re) * Real.sqrt (3)) * (z₂.im - z₁.im) + (z₂.im - z₁.im) * (z₂.im - z₁.im)) := by exact rfl
-        _= Real.sqrt ((1/2) * (1/2)) * Real.sqrt ((z₂.re - z₁.re) * (z₂.re - z₁.re) + 2* (z₂.re - z₁.re) * ( Real.sqrt (3) * (z₂.im - z₁.im)) + ( Real.sqrt (3) * (z₂.im - z₁.im)) * ( Real.sqrt (3) * (z₂.im - z₁.im)) + (- (z₂.re - z₁.re) * Real.sqrt (3)) * (- (z₂.re - z₁.re) * Real.sqrt (3)) - 2* ((z₂.re - z₁.re) * Real.sqrt (3)) * (z₂.im - z₁.im) + (z₂.im - z₁.im) * (z₂.im - z₁.im)) := by ring
-        _= Real.sqrt ((1/2) * (1/2)) * Real.sqrt (a*a + 2*a*b + b*b + c*c - 2*a*b + d*d) := by ring
         _= Real.sqrt ((1/2) * (1/2)) * Real.sqrt (a*a + b*b + c*c + d*d) := by ring
         _= Real.sqrt ((1/2) * (1/2)) * Real.sqrt ( (z₂.re - z₁.re) * (z₂.re - z₁.re) + (Real.sqrt (3) * (z₂.im - z₁.im)) * (Real.sqrt (3) * (z₂.im - z₁.im)) + (- (z₂.re - z₁.re) * Real.sqrt (3)) * (- (z₂.re - z₁.re) * Real.sqrt (3)) + (z₂.im - z₁.im) * (z₂.im - z₁.im)) := by exact rfl
         _= Real.sqrt ((1/2) * (1/2)) * Real.sqrt ( (z₂.re - z₁.re) * (z₂.re - z₁.re) + (Real.sqrt (3)* Real.sqrt (3) * (z₂.im - z₁.im) * (z₂.im - z₁.im)) + (((z₂.re - z₁.re))  * ((z₂.re - z₁.re) * Real.sqrt (3) * Real.sqrt (3)) + (z₂.im - z₁.im) * (z₂.im - z₁.im))) := by ring
@@ -971,8 +945,6 @@ lemma constructible_numbers_half_point (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ M)
           rw [this]
         }
         _= Real.sqrt ((1/2) * (1/2)) * Real.sqrt ( (a*a) + 3 * (d * d) + 3 * (a * a) + (d * d) ):= by exact rfl
-        _= Real.sqrt ((1/2) * (1/2)) * Real.sqrt ( 4 * (a*a) + 4 * (d * d) ):= by ring
-        _= Real.sqrt ((1/2) * (1/2)) * Real.sqrt ( 4 * (a*a + d * d) ):= by ring
         _= Real.sqrt ((1/2) * (1/2)) * Real.sqrt ( (2*2) * (a*a + d * d) ):= by ring
         _= Real.sqrt ((1/2) * (1/2)) * Real.sqrt (2 *2) * Real.sqrt ( a*a + d * d ):= by {
           rw [Real.sqrt_mul (mul_self_nonneg (2)) (a*a + d * d)]
@@ -989,11 +961,8 @@ lemma constructible_numbers_half_point (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ M)
       · calc Complex.abs (s₁ - z₂) = Complex.abs (⟨x₁,y₁⟩ - ⟨z₂.re, z₂.im⟩) := by exact rfl
         _= Complex.abs ⟨x₁ - z₂.re, y₁ - z₂.im⟩ := by exact rfl
         _= Complex.abs ⟨(1/2) * (z₁.re + z₂.re - Real.sqrt (3) * (z₁.im -z₂.im)) - z₂.re, (1/ 2) * ((z₁.re - z₂.re) * Real.sqrt (3) + (z₁.im + z₂.im)) - z₂.im⟩ := by exact rfl
-        _= Complex.abs ⟨(1/2) * z₁.re + (1/2) * z₂.re - (1/2) * Real.sqrt (3) * (z₁.im -z₂.im) - z₂.re, (1/ 2) * (z₁.re - z₂.re) * Real.sqrt (3) + (1/2) * z₁.im + (1/2) * z₂.im - z₂.im⟩ := by ring
-        _= Complex.abs ⟨(1/2) * z₁.re + (1/2 - 1) * z₂.re  - (1/2) * Real.sqrt (3) * (z₁.im - z₂.im), (1/2) * (z₁.re - z₂.re) * Real.sqrt (3) + (1/2)* z₁.im + (1/2 - 1) * z₂.im⟩ := by ring
         _= Complex.abs ⟨(-1/2) * (z₂.re - z₁.re) + (1/2) * Real.sqrt (3) * (z₂.im - z₁.im), -(1/2) * (z₂.re - z₁.re) * Real.sqrt (3) - (1/2) * (z₂.im -  z₁.im)⟩ := by ring
         _= Real.sqrt (((-1/2) * (z₂.re - z₁.re) + (1/2) * Real.sqrt (3) * (z₂.im - z₁.im))*((-1/2) * (z₂.re - z₁.re) + (1/2) * Real.sqrt (3) * (z₂.im - z₁.im)) + (-(1/2) * (z₂.re - z₁.re) * Real.sqrt (3) - (1/2) * (z₂.im -  z₁.im))*(-(1/2) * (z₂.re - z₁.re) * Real.sqrt (3) - (1/2) * (z₂.im -  z₁.im))) := by exact rfl
-        _= Real.sqrt (((-1/2) * (-1/2) * ((z₂.re - z₁.re) - Real.sqrt (3) * (z₂.im - z₁.im))*((z₂.re - z₁.re) -  Real.sqrt (3) * (z₂.im - z₁.im)) + (-1/2) * (-1/2) * ((z₂.re - z₁.re) * Real.sqrt (3) + (z₂.im -  z₁.im))*((z₂.re - z₁.re) * Real.sqrt (3) + (z₂.im - z₁.im)))) := by ring
         _= Real.sqrt (((-1/2) * (-1/2) * (((z₂.re - z₁.re) - Real.sqrt (3) * (z₂.im - z₁.im))*((z₂.re - z₁.re) -  Real.sqrt (3) * (z₂.im - z₁.im)) + ((z₂.re - z₁.re) * Real.sqrt (3) + (z₂.im -  z₁.im))*((z₂.re - z₁.re) * Real.sqrt (3) + (z₂.im - z₁.im))))):= by ring
         _= Real.sqrt ((-1/2) * (-1/2)) * Real.sqrt (((z₂.re - z₁.re) - (Real.sqrt (3) * (z₂.im - z₁.im)))*((z₂.re - z₁.re) -  (Real.sqrt (3) * (z₂.im - z₁.im))) + ((z₂.re - z₁.re) * Real.sqrt (3) + (z₂.im -  z₁.im))*((z₂.re - z₁.re) * Real.sqrt (3) + (z₂.im - z₁.im))):= by {
           exact Real.sqrt_mul (mul_self_nonneg (-1/2)) (((z₂.re - z₁.re) - (Real.sqrt (3) * (z₂.im - z₁.im)))*((z₂.re - z₁.re) -  (Real.sqrt (3) * (z₂.im - z₁.im))) + ((z₂.re - z₁.re) * Real.sqrt (3) + (z₂.im -  z₁.im))*((z₂.re - z₁.re) * Real.sqrt (3) + (z₂.im - z₁.im)))
@@ -1015,9 +984,6 @@ lemma constructible_numbers_half_point (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ M)
           rw [this]
           ring
         }
-        _= Real.sqrt ((-1/2) * (-1/2)) * Real.sqrt ( a*a + 3 * d*d + a*a *3 + d*d) := by ring
-        _= Real.sqrt ((-1/2) * (-1/2)) * Real.sqrt ( 4 * a*a + 4 * d*d) := by ring
-        _= Real.sqrt ((-1/2) * (-1/2)) * Real.sqrt ( 4 * (a*a + d*d)) := by ring
         _= Real.sqrt ((-1/2) * (-1/2)) * Real.sqrt ( (2*2) * (a*a + d*d)) := by ring
         _= Real.sqrt ((-1/2) * (-1/2)) * Real.sqrt (2 *2) * Real.sqrt ( a*a + d*d) := by {
           rw [Real.sqrt_mul (mul_self_nonneg (2)) (a*a + d*d)]
@@ -1043,20 +1009,13 @@ lemma constructible_numbers_half_point (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ M)
       · calc Complex.abs (s₂ - z₁) = Complex.abs (⟨x₂,y₂⟩ - ⟨z₁.re, z₁.im⟩) := by exact rfl
         _= Complex.abs ⟨x₂ - z₁.re, y₂ - z₁.im⟩ := by exact rfl
         _= Complex.abs ⟨(1/2) * (z₁.re + z₂.re + Real.sqrt (3) * (z₁.im -z₂.im)) - z₁.re, (1/ 2) * ((z₂.re - z₁.re) * Real.sqrt (3) + (z₁.im + z₂.im)) - z₁.im⟩ := by exact rfl
-        _= Complex.abs ⟨(1/2) * z₁.re + (1/2) * z₂.re + (1/2) * Real.sqrt (3) * (z₁.im -z₂.im) - z₁.re, (1/ 2) * (z₂.re - z₁.re) * Real.sqrt (3) + (1/2) * z₁.im + (1/2) * z₂.im - z₁.im⟩ := by ring
-        _= Complex.abs ⟨(-1 + 1/2) * z₁.re + (1/2) * z₂.re + (1/2 ) * Real.sqrt (3) * (z₁.im -z₂.im), (1/2) * (z₂.re - z₁.re) * Real.sqrt (3) + (1/2) * z₂.im + (1/2 - 1) * z₁.im⟩ := by ring
-        _= Complex.abs ⟨(-1/2) * z₁.re + (1/2) * z₂.re + (1/2 ) * Real.sqrt (3) * (z₁.im -z₂.im), (1/2) * (z₂.re - z₁.re) * Real.sqrt (3) + (1/2) * z₂.im + (- 1/2) * z₁.im⟩ := by ring
-        _= Complex.abs ⟨(-1/2) * z₁.re + (1/2) * z₂.re - (1/2 ) * Real.sqrt (3) * (z₂.im -z₁.im), (1/2) * (z₂.re - z₁.re) * Real.sqrt (3) + (1/2) * z₂.im - (1/2) * z₁.im⟩ := by ring
         _= Complex.abs ⟨(1/2) * ((z₂.re - z₁.re) -  Real.sqrt (3) * (z₂.im -z₁.im)), (1/2) * ((z₂.re - z₁.re) * Real.sqrt (3) + (z₂.im - z₁.im))⟩ := by ring
         _= Complex.abs ⟨(1/2) * ((a - Real.sqrt (3) * b)), (1/2) * (a * Real.sqrt (3) + b)⟩ := by exact rfl
         _= Real.sqrt (((1/2) * ((a - Real.sqrt (3) * b)))*((1/2) * ((a - Real.sqrt (3) * b))) + ((1/2) * (a * Real.sqrt (3) + b))*((1/2) * (a * Real.sqrt (3) + b))) := by exact rfl
-        _= Real.sqrt (((1/2) * (1/2) * ((a - Real.sqrt (3) * b))*((a - Real.sqrt (3) * b)) + (1/2) * (1/2) * (a * Real.sqrt (3) + b)*(a * Real.sqrt (3) + b))) := by ring
-        _= Real.sqrt ((1/2) * (1/2) * ((a - Real.sqrt (3) * b))*((a - Real.sqrt (3) * b)) + (1/2) * (1/2) * (a * Real.sqrt (3) + b)*(a * Real.sqrt (3) + b)) := by ring
         _= Real.sqrt ((1/2) * (1/2) * (((a - Real.sqrt (3) * b))*((a - Real.sqrt (3) * b)) + (a * Real.sqrt (3) + b)*(a * Real.sqrt (3) + b))) := by ring
         _= Real.sqrt ((1/2) * (1/2)) * Real.sqrt (((a - Real.sqrt (3) * b))*((a - Real.sqrt (3) * b)) + (a * Real.sqrt (3) + b)*(a * Real.sqrt (3) + b)) := by {
           exact Real.sqrt_mul (mul_self_nonneg (1/2)) (((a - Real.sqrt (3) * b))*((a - Real.sqrt (3) * b)) + (a * Real.sqrt (3) + b)*(a * Real.sqrt (3) + b))
         }
-        _= Real.sqrt ((1/2) * (1/2)) * Real.sqrt (((a - Real.sqrt (3) * b))*((a - Real.sqrt (3) * b)) + (a * Real.sqrt (3) + b)*(a * Real.sqrt (3) + b)) := by ring
         _= Real.sqrt ((1/2) * (1/2)) * Real.sqrt ((a*a - 2*a*Real.sqrt (3) * b + Real.sqrt (3) * Real.sqrt (3) * b*b + a*a *Real.sqrt (3) *Real.sqrt (3) + 2*a*Real.sqrt (3) * b + b*b)) := by ring
         _= Real.sqrt ((1/2) * (1/2)) * Real.sqrt ((a*a - 2*a*Real.sqrt (3) * b + 3 * b*b + a*a * Real.sqrt (3) * Real.sqrt (3) + 2*a*Real.sqrt (3) * b + b*b)) := by {
           have : Real.sqrt (3) * Real.sqrt (3) = 3 := by {
@@ -1072,8 +1031,6 @@ lemma constructible_numbers_half_point (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ M)
           rw [this]
           ring
         }
-        _= Real.sqrt ((1/2) * (1/2)) * Real.sqrt ( 4 * a*a + 4 * b*b) := by ring
-        _= Real.sqrt ((1/2) * (1/2)) * Real.sqrt ( 4 * (a*a + b*b)) := by ring
         _= Real.sqrt ((1/2) * (1/2)) * Real.sqrt ( (2*2) * (a*a + b*b)) := by ring
         _= Real.sqrt ((1/2) * (1/2)) * Real.sqrt (2 *2) * Real.sqrt ( a*a + b*b) := by {
           rw [Real.sqrt_mul (mul_self_nonneg (2)) (a*a + b*b)]
@@ -1090,21 +1047,13 @@ lemma constructible_numbers_half_point (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ M)
       · calc Complex.abs (s₂ - z₂) = Complex.abs (⟨x₂,y₂⟩ - ⟨z₂.re, z₂.im⟩) := by exact rfl
         _= Complex.abs ⟨x₂ - z₂.re, y₂ - z₂.im⟩ := by exact rfl
         _= Complex.abs ⟨(1/2) * (z₁.re + z₂.re + Real.sqrt (3) * (z₁.im -z₂.im)) - z₂.re, (1/ 2) * ((z₂.re - z₁.re) * Real.sqrt (3) + (z₁.im + z₂.im)) - z₂.im⟩ := by exact rfl
-        _= Complex.abs ⟨(1/2) * z₁.re + (1/2) * z₂.re + (1/2) * Real.sqrt (3) * (z₁.im -z₂.im) - z₂.re, (1/ 2) * (z₂.re - z₁.re) * Real.sqrt (3) + (1/2) * z₁.im + (1/2) * z₂.im - z₂.im⟩ := by ring
-        _= Complex.abs ⟨(-1 + 1/2) * z₂.re + (1/2) * z₁.re + (1/2 ) * Real.sqrt (3) * (z₁.im -z₂.im), (1/2) * (z₂.re - z₁.re) * Real.sqrt (3) + (1/2) * z₁.im + (1/2 - 1) * z₂.im⟩ := by ring
-        _= Complex.abs ⟨(-1/2) * z₂.re + (1/2) * z₁.re + (1/2 ) * Real.sqrt (3) * (z₁.im -z₂.im), (1/2) * (z₂.re - z₁.re) * Real.sqrt (3) + (1/2) * z₁.im + (1/2 - 1) * z₂.im⟩ := by ring
-        _= Complex.abs ⟨(-1/2) * z₂.re + (1/2) * z₁.re - (1/2 ) * Real.sqrt (3) * (z₂.im -z₁.im), (1/2) * (z₂.re - z₁.re) * Real.sqrt (3) + (1/2) * z₁.im - (1/2) * z₂.im⟩ := by ring
-        _= Complex.abs ⟨(1/2) * ((z₁.re - z₂.re) -  Real.sqrt (3) * (z₂.im -z₁.im)), (1/2) * ((z₂.re - z₁.re) * Real.sqrt (3) + (z₁.im - z₂.im))⟩ := by ring
         _= Complex.abs ⟨(-1/2) * ((z₂.re - z₁.re) +  Real.sqrt (3) * (z₂.im -z₁.im)), (-1/2) * (-(z₂.re - z₁.re) * Real.sqrt (3) + (z₂.im - z₁.im))⟩ := by ring
         _= Complex.abs ⟨(-1/2) * (a + Real.sqrt (3) * b), (-1/2) * (-a * Real.sqrt (3) + b)⟩ := by exact rfl
         _= Real.sqrt (((-1/2) * (a + Real.sqrt (3) * b))*((-1/2) * (a + Real.sqrt (3) * b)) + ((-1/2) * (-a * Real.sqrt (3) + b))*((-1/2) * (-a * Real.sqrt (3) + b))) := by exact rfl
-        _= Real.sqrt (((-1/2) * (-1/2) * (a + Real.sqrt (3) * b))*((a + Real.sqrt (3) * b)) + ((-1/2) * (-1/2) * (-a * Real.sqrt (3) + b))*(-a * Real.sqrt (3) + b)) := by ring
-        _= Real.sqrt ((-1/2) * (-1/2) * (a + Real.sqrt (3) * b)*((a + Real.sqrt (3) * b)) + (-1/2) * (-1/2) * (-a * Real.sqrt (3) + b)*(-a * Real.sqrt (3) + b)) := by ring
         _= Real.sqrt ((-1/2) * (-1/2) * (((a + Real.sqrt (3) * b))*((a + Real.sqrt (3) * b)) + ((-a * Real.sqrt (3) + b))*(-a * Real.sqrt (3) + b))) := by ring
         _= Real.sqrt ((-1/2) * (-1/2)) * Real.sqrt (((a + Real.sqrt (3) * b))*((a + Real.sqrt (3) * b)) + ((-a * Real.sqrt (3) + b))*(-a * Real.sqrt (3) + b)) := by {
           exact Real.sqrt_mul (mul_self_nonneg (-1/2)) (((a + Real.sqrt (3) * b))*((a + Real.sqrt (3) * b)) + ((-a * Real.sqrt (3) + b))*(-a * Real.sqrt (3) + b))
         }
-        _= Real.sqrt ((-1/2) * (-1/2)) * Real.sqrt (((a + Real.sqrt (3) * b))*((a + Real.sqrt (3) * b)) + ((-a * Real.sqrt (3) + b))*(-a * Real.sqrt (3) + b)) := by ring
         _= Real.sqrt ((-1/2) * (-1/2)) * Real.sqrt ((a*a + 2*a*Real.sqrt (3) * b + Real.sqrt (3) * Real.sqrt (3) * b*b + a*a *Real.sqrt (3) *Real.sqrt (3) + -2*a*Real.sqrt (3) * b + b*b)) := by ring
         _= Real.sqrt ((-1/2) * (-1/2)) * Real.sqrt ((a*a + 2*a*Real.sqrt (3) * b + 3 * b*b + a*a * Real.sqrt (3) * Real.sqrt (3) + -2*a*Real.sqrt (3) * b + b*b)) := by {
           have : Real.sqrt (3) * Real.sqrt (3) = 3 := by {
@@ -1120,8 +1069,6 @@ lemma constructible_numbers_half_point (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ M)
           rw [this]
           ring
         }
-        _= Real.sqrt ((-1/2) * (-1/2)) * Real.sqrt ( 4 * a*a + 4 * b*b) := by ring
-        _= Real.sqrt ((-1/2) * (-1/2)) * Real.sqrt ( 4 * (a*a + b*b)) := by ring
         _= Real.sqrt ((-1/2) * (-1/2)) * Real.sqrt ( (2*2) * (a*a + b*b)) := by ring
         _= Real.sqrt ((-1/2) * (-1/2)) * Real.sqrt (2 *2) * Real.sqrt ( a*a + b*b) := by {
           rw [Real.sqrt_mul (mul_self_nonneg (2)) (a*a + b*b)]
@@ -1202,7 +1149,6 @@ lemma constructible_numbers_half_point (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ M)
               rw [this] at hzz'
               calc t = (z₁.re - 2⁻¹ * (z₁.re + z₂.re + Real.sqrt 3 * (z₁.im - z₂.im))) / -(Real.sqrt 3 * (z₁.im - z₂.im)) := by exact id hzz'.symm
               _= 1/2 * (z₁.re - z₂.re - Real.sqrt 3 * (z₁.im - z₂.im)) / (Real.sqrt 3 * (z₂.im - z₁.im)) := by ring
-
             }
             by_cases hrealnot0 : z₁.re - z₂.re = 0
             · have hrealnot0' : z₁.re = z₂.re := by {
@@ -1321,18 +1267,15 @@ lemma constructible_numbers_half_point (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ M)
       · use 1/2
         calc (1/2 : ℝ ) * L1.z₁ + (1 - (1/2 : ℝ ) ) * L1.z₂ = (1/2) * z₁ + (1 - (1/2)) * z₂ := by simp
         _= (1/2) * z₁ + (1/2) * z₂ := by norm_num
-        _= (1/2) *(z₁ + z₂) := by ring
         _= (z₁ + z₂) / 2 := by ring
       · use 1/2
-      -- had to start like this, somehow lean didnt manage to understand the notation i used above, i think because it was to slow after all these steps
+      -- had to start like this, somehow lean didnt manage to understand the notation i used above, i think because it was too slow after all these steps
         calc (1/2 : ℝ ) * ⟨2⁻¹ * (z₁.re + z₂.re - Real.sqrt 3 * (z₁.im - z₂.im)), 2⁻¹ * ((z₁.re - z₂.re) * Real.sqrt 3 + (z₁.im + z₂.im)) ⟩ + (1 - (1/2 : ℝ)) * ⟨2⁻¹ * (z₁.re + z₂.re + Real.sqrt 3 * (z₁.im - z₂.im)), 2⁻¹ * ((z₂.re - z₁.re) * Real.sqrt (3) + (z₁.im + z₂.im))⟩ =  (1/2 : ℝ) * L2.z₁ + (1 - (1/2 : ℝ ) ) * L2.z₂  := by simp
         _= (1/2) * s₁ + (1 - (1/2)) * s₂ := by simp
         _= (1/2) * s₁ + (1/2) * s₂ := by norm_num
         _= (1/2) * (s₁ + s₂) := by ring
         _= (1/2) * (⟨x₁, y₁⟩ + ⟨x₂, y₂⟩) := by exact rfl
         _= (1/2) * ⟨(1/2) * (z₁.re + z₂.re - Real.sqrt (3) * (z₁.im -z₂.im)) + (1/2) * (z₁.re + z₂.re + Real.sqrt (3) * (z₁.im -z₂.im)), (1/ 2) * ((z₁.re - z₂.re) * Real.sqrt (3) + (z₁.im + z₂.im)) + (1/ 2) * ((z₂.re - z₁.re) * Real.sqrt (3) + (z₁.im + z₂.im))⟩ := by exact rfl
-        _= (1/2) * ⟨(1/2) * z₁.re + (1/2)* z₂.re - (1/2) * Real.sqrt (3) * (z₁.im -z₂.im) + (1/2) * z₁.re + (1/2) * z₂.re + (1/2) * Real.sqrt (3) * (z₁.im -z₂.im), (1/ 2) * (z₁.re - z₂.re) * Real.sqrt (3) + (1/2) * z₁.im +  (1/2) * z₂.im + (1/ 2) * (z₂.re - z₁.re) * Real.sqrt (3) + (1/2) * z₁.im + (1/2) * z₂.im⟩ := by ring
-        _= (1/2) * ⟨(1/2) * z₁.re + (1/2)* z₂.re + (1/2) * z₁.re + (1/2) * z₂.re , (1/ 2) * (z₁.re - z₂.re) * Real.sqrt (3) - (1/ 2) * (z₁.re - z₂.re) * Real.sqrt (3) + (1/2) * z₁.im + (1/2) * z₂.im + (1/2) * z₁.im + (1/2) * z₂.im⟩ := by ring
         _= (1/2) * ⟨z₁.re + z₂.re, z₁.im + z₂.im⟩ := by ring
         _= (1/2) * (z₁ + z₂) := by exact rfl
         _= (z₁ + z₂) / 2 := by ring
@@ -1340,7 +1283,7 @@ lemma constructible_numbers_half_point (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ M)
     exact element_line_line_intersection_constructible M h0 h1 L1 L2 hL1 hL2 ((z₁ + z₂) /2) hll h
 
 }
-
+--needed for arbitrary multiplication. In this case angles are interpreted as e^(i*angle)
 lemma constructible_numbers_add_angles (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ M) (a b : ℝ) (ha: Complex.exp (Complex.I* a) ∈ constructible_numbers M (h0) (h1)) (hb:  Complex.exp (Complex.I* b) ∈ constructible_numbers M (h0) (h1)):
   Complex.exp (Complex.I* (a+b)) ∈ constructible_numbers M (h0) (h1) := by{
     let C1 : circle_with_radius := {center := 0, radius := 1}
@@ -1375,37 +1318,37 @@ lemma constructible_numbers_add_angles (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ M)
       intro hcc'
       exact (this (id hcc'.symm)).elim
     }
-    let z : ℂ := Complex.exp (⟨0,1⟩ * (a+b))
+    let z : ℂ := Complex.exp (Complex.I * (a+b))
     have hz : z ∈ C1.points ∩ C2.points := by{
       simp
       constructor
       · calc Complex.abs (z - 0) = Complex.abs z := by simp
-        _= Complex.abs (Complex.exp (⟨0,1⟩ * (a+b))) := by exact rfl
-        _= Complex.abs (Complex.exp (⟨0,1⟩ * a + ⟨0,1⟩ * b)) := by ring
-        _= Complex.abs (Complex.exp (⟨0,1⟩ * a) * Complex.exp (⟨0,1⟩ * b)) := by rw[Complex.exp_add (⟨0,1⟩ * a) (⟨0,1⟩ * b)]
-        _= Complex.abs (Complex.exp (⟨0,1⟩ * a)) * Complex.abs (Complex.exp (⟨0,1⟩ * b)) := by rw [@AbsoluteValue.map_mul]
-        _= 1 * Complex.abs (Complex.exp (⟨0,1⟩ * b)) := by {
-          rw [Complex.abs_exp (⟨0,1⟩ * a)]
+        _= Complex.abs (Complex.exp (Complex.I * (a+b))) := by exact rfl
+        _= Complex.abs (Complex.exp (Complex.I * a + Complex.I * b)) := by ring
+        _= Complex.abs (Complex.exp (Complex.I * a) * Complex.exp (Complex.I * b)) := by rw[Complex.exp_add (Complex.I * a) (Complex.I * b)]
+        _= Complex.abs (Complex.exp (Complex.I * a)) * Complex.abs (Complex.exp (Complex.I * b)) := by rw [@AbsoluteValue.map_mul]
+        _= 1 * Complex.abs (Complex.exp (Complex.I * b)) := by {
+          rw [Complex.abs_exp (Complex.I * a)]
           simp
         }
-        _= Complex.abs (Complex.exp (⟨0,1⟩ * b)) := by simp
+        _= Complex.abs (Complex.exp (Complex.I * b)) := by simp
         _= 1 := by {
-          rw [Complex.abs_exp (⟨0,1⟩ * b)]
+          rw [Complex.abs_exp (Complex.I * b)]
           simp
         }
         _= C1.radius := by exact rfl
-      · calc Complex.abs (z - Complex.exp (⟨0,1⟩ * a)) = Complex.abs (Complex.exp (⟨0,1⟩ * (a+b)) - Complex.exp (⟨0,1⟩ * a)) := by exact rfl
-        _= Complex.abs (Complex.exp (⟨0,1⟩ * a + ⟨0,1⟩ * b) - Complex.exp (⟨0,1⟩ * a)) := by ring
-        _= Complex.abs (Complex.exp (⟨0,1⟩ * a) * Complex.exp (⟨0,1⟩ * b) - Complex.exp (⟨0,1⟩ * a)) := by rw[Complex.exp_add (⟨0,1⟩ * a) (⟨0,1⟩ * b)]
-        _= Complex.abs (Complex.exp (⟨0,1⟩ *a) * (Complex.exp (⟨0,1⟩ *b) - 1)) := by ring
-        _= Complex.abs (Complex.exp (⟨0,1⟩ *a)) * Complex.abs (Complex.exp (⟨0,1⟩ *b) - 1) := by rw [@AbsoluteValue.map_mul]
-        _= 1 * Complex.abs (Complex.exp (⟨0,1⟩ *b) - 1) := by {
-          rw [Complex.abs_exp (⟨0,1⟩ * a)]
+      · calc Complex.abs (z - Complex.exp (Complex.I * a)) = Complex.abs (Complex.exp (Complex.I * (a+b)) - Complex.exp (Complex.I * a)) := by exact rfl
+        _= Complex.abs (Complex.exp (Complex.I * a + Complex.I * b) - Complex.exp (Complex.I * a)) := by ring
+        _= Complex.abs (Complex.exp (Complex.I * a) * Complex.exp (Complex.I * b) - Complex.exp (Complex.I * a)) := by rw[Complex.exp_add (Complex.I * a) (Complex.I * b)]
+        _= Complex.abs (Complex.exp (Complex.I *a) * (Complex.exp (Complex.I *b) - 1)) := by ring
+        _= Complex.abs (Complex.exp (Complex.I *a)) * Complex.abs (Complex.exp (Complex.I *b) - 1) := by rw [@AbsoluteValue.map_mul]
+        _= 1 * Complex.abs (Complex.exp (Complex.I *b) - 1) := by {
+          rw [Complex.abs_exp (Complex.I * a)]
           simp
         }
-        _= Complex.abs (Complex.exp (⟨0,1⟩ *b) - 1) := by simp
-        _= Complex.abs (- (1 - Complex.exp (⟨0,1⟩ *b))) := by ring
-        _= Complex.abs (1 - Complex.exp (⟨0,1⟩ *b)) := by rw [@AbsoluteValue.map_neg]
+        _= Complex.abs (Complex.exp (Complex.I *b) - 1) := by simp
+        _= Complex.abs (- (1 - Complex.exp (Complex.I *b))) := by ring
+        _= Complex.abs (1 - Complex.exp (Complex.I *b)) := by rw [@AbsoluteValue.map_neg]
         _= C2.radius := by exact rfl
     }
     have hz' : z ∈ constructible_numbers M (h0) (h1) := by{
@@ -1416,10 +1359,10 @@ lemma constructible_numbers_add_angles (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ M)
 
 lemma constructible_numbers_from_coords (M : Set ℂ) (h0: 0 ∈ M) (h1: 1 ∈ M) (a b : ℝ) (ha: ⟨a, 0⟩ ∈ constructible_numbers M (h0) (h1)) (hb: ⟨b, 0⟩ ∈ constructible_numbers M (h0) (h1)): ⟨a, b⟩ ∈ constructible_numbers M (h0) (h1) := by{
   let ib : ℂ := ⟨0, b⟩
-  let L : line_through_two_points := {z₁ := 0, z₂ := ⟨0,1⟩}
+  let L : line_through_two_points := {z₁ := 0, z₂ := Complex.I}
   have hL : L ∈ constructible_lines (constructible_numbers M (h0) (h1)) := by{
     use 0
-    use ⟨0,1⟩
+    use Complex.I
     simp
     constructor
     · exact constructible_numbers_element_of M h0 h1 0 h0
@@ -1440,11 +1383,11 @@ lemma constructible_numbers_from_coords (M : Set ℂ) (h0: 0 ∈ M) (h1: 1 ∈ M
   have h : ib ∈ line_circle_intersection L C := by{
     constructor
     · use 1 - b
-      calc (1 - b : ℝ ) * L.z₁ + (1 - (1 - b : ℝ ) ) * L.z₂ = (1 - b : ℝ ) * 0 + (1 - (1 - b : ℝ ) ) * ⟨0,1⟩ := by exact rfl
-      _= (1 - b : ℝ ) * 0 + (1 - (1 - b : ℝ ) ) * ⟨0,1⟩ := by norm_num
-      _= 0 + (1 - (1 - b : ℝ ) ) * ⟨0,1⟩ := by ring
-      _= (1 + (- 1 + b )) * ⟨0,1⟩ := by simp
-      _= b * ⟨0,1⟩ := by ring
+      calc (1 - b : ℝ ) * L.z₁ + (1 - (1 - b : ℝ ) ) * L.z₂ = (1 - b : ℝ ) * 0 + (1 - (1 - b : ℝ ) ) * Complex.I := by exact rfl
+      _= (1 - b : ℝ ) * 0 + (1 - (1 - b : ℝ ) ) * Complex.I := by norm_num
+      _= 0 + (1 - (1 - b : ℝ ) ) * Complex.I := by ring
+      _= (1 + (- 1 + b )) * Complex.I := by simp
+      _= b * Complex.I := by ring
       _= ⟨b * 0, b * 1⟩ := by {
         refine Complex.ext_iff.mpr ?_
         constructor
@@ -1533,7 +1476,7 @@ lemma constructible_numbers_contains_complex_iff_contains_coords (M : Set ℂ) (
     rw [hz1]
     exact constructible_numbers_closed_addition M h0 h1 ⟨z.re, 0⟩ ⟨0, z.im⟩ h.1 h.2
 }
-
+-- main work for containing multiplication of reals is here, for the general case below we just use this lemma in different cases
 lemma constructible_numbers_multiplication_pos_reals_geq (M : Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ M) (a b : ℝ) (ha1 : a > 0) (hb1: b > 0) (h: a ≥ b) (ha2: (a : ℂ )  ∈ constructible_numbers M (h0) (h1)) (hb2: (b : ℂ)  ∈ constructible_numbers M (h0) (h1)) :
 ((a*b : ℂ ) ) ∈ constructible_numbers M (h0) (h1) := by{
     have hbim : ⟨0, b⟩ ∈ constructible_numbers M (h0) (h1) := by{
@@ -1565,7 +1508,7 @@ lemma constructible_numbers_multiplication_pos_reals_geq (M : Set ℂ) (h0 : 0 �
       · exact constructible_numbers_element_of M h0 h1 0 h0
       · exact hb'
     }
-    let I : ℂ := ⟨0,1⟩
+    let I : ℂ := Complex.I
     have hI : I ∈ constructible_numbers M (h0) (h1) := by{
       exact constructible_numbers_contains_I M h0 h1
     }
@@ -1618,11 +1561,8 @@ lemma constructible_numbers_multiplication_pos_reals_geq (M : Set ℂ) (h0 : 0 �
         calc (1 - a*b : ℝ ) * L2.z₁ + (1 - (1 - a*b : ℝ ) ) * L2.z₂ = (1 - a*b : ℝ ) * a + (1 - (1 - a*b : ℝ ) ) * (I + a) := by exact rfl
         _= (1 - a*b : ℝ ) * a + (1 - (1 - a*b : ℝ ) ) * (I + a) := by norm_num
         _= (1 - a*b) * a + (1 - (1 - a*b)) * (I + a) := by simp
-        _= a - a*a*b + (1 - (1 - a*b)) * (I + a) := by ring
-        _= a - a*a*b + (a*b) * (I + a) := by ring
-        _= a - a*a*b + (a*b) * I + a*a*b := by ring
         _= a + (a*b) * I := by ring
-        _= a + (a*b) * ⟨0,1⟩ := by exact rfl
+        _= a + (a*b) * Complex.I := by exact rfl
         _= a + ⟨0, a*b⟩ := by {
           refine Complex.ext_iff.mpr ?_
           constructor
@@ -1825,12 +1765,10 @@ lemma constructible_numbers_contains_arg (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ 
         _= (1 - 1/Complex.abs z : ℝ) * 0 + (1 - (1 - 1/Complex.abs z : ℝ)) * z := by norm_num
         _= (1 - (1 - 1/Complex.abs z : ℝ)) * z := by ring
         _= (1 - (1 - 1/Complex.abs z )) * z := by simp
-        _= (1/Complex.abs z) * z := by ring
         _= z * (1/Complex.abs z) := by ring
         _= Complex.abs z * Complex.exp ((Complex.arg z : ℂ) * Complex.I) * (1/Complex.abs z) := by {
           simp
         }
-        _= Complex.exp ((Complex.arg z : ℂ) * Complex.I) * (Complex.abs z * (1/Complex.abs z)) := by ring
         _= Complex.exp ((Complex.arg z : ℂ) * Complex.I) * (Complex.abs z / Complex.abs z) := by ring
         _= Complex.exp ((Complex.arg z : ℂ) * Complex.I) * 1 := by {
           aesop
@@ -1845,7 +1783,7 @@ lemma constructible_numbers_contains_arg (M: Set ℂ) (h0 : 0 ∈ M) (h1: 1 ∈ 
     }
     exact element_line_circle_intersection_constructible M h0 h1 L C hL hC (Complex.exp ((Complex.arg z : ℂ) * Complex.I )) hz'
 }
-
+-- no constructions needed anymore just combination of all the lemmas above
 theorem constructible_numbers_closed_multiplication (M : Set ℂ) (h0: 0 ∈ M) (h1: 1 ∈M) (a b  : ℂ ) (ha : a ∈  constructible_numbers M (h0) (h1)) (hb : b ∈ constructible_numbers M (h0) (h1)) (ha' : a ≠0 ) (hb' : b ≠ 0):
 a*b ∈ constructible_numbers M (h0) (h1) := by{
   have hab : a*b = Complex.abs a * Complex.exp ((Complex.arg a:ℂ) * Complex.I) * (Complex.abs b * Complex.exp ((Complex.arg b:ℂ) * Complex.I)) := by{
@@ -1909,15 +1847,15 @@ a*b ∈ constructible_numbers M (h0) (h1) := by{
   rw [← habs'] at hr
   exact construcible_numbers_contains_number_if_abs_and_arg M h0 h1 (a*b) (mul_ne_zero ha' hb')  hφ' hr
 }
-
+-- again main work for division is here, for the general case below we combine this lemma with others
 lemma constructible_numbers_contains_reel_inverse (M: Set ℂ) (h0 : 0 ∈ M) (h1 : 1 ∈ M) (r : ℝ) (hr: (r : ℂ ) ∈ constructible_numbers M h0 h1) (hr' : r ≠ 0):
 (r⁻¹ : ℂ ) ∈ constructible_numbers M h0 h1 := by{
   let r' : ℂ := ⟨r, 1⟩
   have hr'' : r' ∈ constructible_numbers M h0 h1 := by{
     let R : ℂ := ⟨r, 0⟩ + ⟨0, 1⟩
     have h : R ∈ constructible_numbers M (h0) (h1) := by{
-      have hb'' : ⟨r,0⟩ + ⟨0,1⟩  ∈ constructible_numbers M (h0) (h1) := by{
-        exact constructible_numbers_closed_addition M h0 h1 ⟨r,0⟩ ⟨0,1⟩ (hr) (constructible_numbers_contains_I M h0 h1)
+      have hb'' : ⟨r,0⟩ + Complex.I  ∈ constructible_numbers M (h0) (h1) := by{
+        exact constructible_numbers_closed_addition M h0 h1 ⟨r,0⟩ Complex.I (hr) (constructible_numbers_contains_I M h0 h1)
       }
       exact hb''
     }
@@ -1938,14 +1876,14 @@ lemma constructible_numbers_contains_reel_inverse (M: Set ℂ) (h0 : 0 ∈ M) (h
     · exact constructible_numbers_element_of M h0 h1 0 h0
     · exact hr''
   }
-  let L2: line_through_two_points := {z₁ := 1, z₂ := 1 + ⟨0,1⟩}
+  let L2: line_through_two_points := {z₁ := 1, z₂ := 1 + Complex.I}
   have hL2 : L2 ∈ constructible_lines (constructible_numbers M (h0) (h1)) := by{
     use 1
-    use 1 + ⟨0,1⟩
+    use 1 + Complex.I
     simp
     constructor
     · exact constructible_numbers_element_of M h0 h1 1 h1
-    · exact constructible_numbers_closed_addition M h0 h1 1 ⟨0,1⟩ (constructible_numbers_element_of M h0 h1 1 h1) (constructible_numbers_contains_I M h0 h1)
+    · exact constructible_numbers_closed_addition M h0 h1 1 Complex.I (constructible_numbers_element_of M h0 h1 1 h1) (constructible_numbers_contains_I M h0 h1)
   }
 
   have hll : L1.points ≠ L2.points := by{
@@ -1977,7 +1915,6 @@ lemma constructible_numbers_contains_reel_inverse (M: Set ℂ) (h0 : 0 ∈ M) (h
       _= (1 - (r - 1) / r  ) * ⟨r,1⟩ := by simp
       _= (1 - (r / r - 1 / r )) * ⟨r,1⟩ := by ring
       _= (1 - (1 - 1 / r )) * ⟨r,1⟩ := by aesop
-      _= (1 - 1 + 1 / r ) * ⟨r,1⟩ := by ring
       _= (1 / r ) * ⟨r,1⟩ := by ring
       _= ⟨1 / r * r, 1 / r * 1⟩ := by {
         refine Complex.ext_iff.mpr ?_
@@ -1989,14 +1926,12 @@ lemma constructible_numbers_contains_reel_inverse (M: Set ℂ) (h0 : 0 ∈ M) (h
       _= ⟨1, 1 / r⟩ := by simp
       _= ⟨1, r⁻¹⟩ := by simp
     · use (r-1) / r
-      calc ((r - 1) / r : ℝ ) * L2.z₁ + (1 - ((r - 1) / r : ℝ ) ) * L2.z₂ = ((r - 1) / r : ℝ ) * 1 + (1 - ((r - 1) / r : ℝ ) ) * (1 + ⟨0,1⟩) := by exact rfl
-      _= ((r - 1) / r : ℝ ) * 1 + (1 - ((r - 1) / r : ℝ ) ) * (1 + ⟨0,1⟩) := by norm_num
-      _= ((r - 1) / r ) + (1 - ((r - 1) / r  ) ) * (1 + ⟨0,1⟩) := by simp
-      _= ((r - 1) / r ) + (1 - ((r - 1) / r  ) ) + (1 - ((r - 1) / r  ) ) * ⟨0,1⟩ := by ring
-      _=  1  + (1 - ((r - 1) / r  ) ) * ⟨0,1⟩ := by ring
-      _=  1  + (1 - ((r / r) - (1 / r))) * ⟨0,1⟩ := by ring
-      _=  1  + (1 - (1 - (1 / r))) * ⟨0,1⟩ := by aesop
-      _=  1  + ((1 / r)) * ⟨0,1⟩ := by ring
+      calc ((r - 1) / r : ℝ ) * L2.z₁ + (1 - ((r - 1) / r : ℝ ) ) * L2.z₂ = ((r - 1) / r : ℝ ) * 1 + (1 - ((r - 1) / r : ℝ ) ) * (1 + Complex.I) := by exact rfl
+      _= ((r - 1) / r : ℝ ) * 1 + (1 - ((r - 1) / r : ℝ ) ) * (1 + Complex.I) := by norm_num
+      _= ((r - 1) / r ) + (1 - ((r - 1) / r  ) ) * (1 + Complex.I) := by simp
+      _=  1  + (1 - ((r / r) - (1 / r))) * Complex.I := by ring
+      _=  1  + (1 - (1 - (1 / r))) * Complex.I := by aesop
+      _=  1  + ((1 / r)) * Complex.I := by ring
       _=  1  + ⟨0, (1 / r)⟩ := by {
         refine Complex.ext_iff.mpr ?_
         constructor
@@ -2138,7 +2073,7 @@ a⁻¹ ∈ constructible_numbers M h0 h1 :=by{
 
   exact constructible_numbers_closed_multiplication M h0 h1 (Complex.abs a⁻¹) (conj (Complex.exp ((Complex.arg (a)) * Complex.I))) habs harg (habsnotnull) (hargnotnull)
 }
-
+-- again main work for real square roots is here, for the general case below we combine this lemma with others
 lemma constructible_numbers_contains_reel_sq_gt_1 (M : Set ℂ) (h0 : 0 ∈ M) (h1 : 1 ∈ M) (r : ℝ) (h: r ≥ 1) (hr: (r : ℂ ) ∈ constructible_numbers M h0 h1) : (Real.sqrt r : ℂ ) ∈ constructible_numbers M h0 h1 := by{
   have hr' : (r/2 : ℂ)  ∈ constructible_numbers M h0 h1 := by{
     have : (r / 2 :ℂ ) = (0 + r) /2 := by simp
@@ -2173,7 +2108,7 @@ lemma constructible_numbers_contains_reel_sq_gt_1 (M : Set ℂ) (h0 : 0 ∈ M) (
     simp
     constructor
     · exact constructible_numbers_element_of M h0 h1 1 h1
-    · exact constructible_numbers_closed_addition M h0 h1 1 ⟨0,1⟩ (constructible_numbers_element_of M h0 h1 1 h1) (constructible_numbers_contains_I M h0 h1)
+    · exact constructible_numbers_closed_addition M h0 h1 1 Complex.I (constructible_numbers_element_of M h0 h1 1 h1) (constructible_numbers_contains_I M h0 h1)
   }
 
   let z : ℂ := ⟨1, Real.sqrt (r-1)⟩
@@ -2316,7 +2251,7 @@ lemma constructible_numbers_contains_reel_sq (M : Set ℂ) (h0 : 0 ∈ M) (h1 : 
     exact hr4
 }
 
---Lean somehow couldn't apply the following 3 lemma from the mathlib, but did it if they are in the same file
+--Lean somehow couldn't apply the following 3 lemma from the mathlib, but did it if i use these ones
 lemma double_angle_sin (a : ℝ ) : Real.sin (a + a) = 2 * Real.sin a * Real.cos a := by{
   rw [Real.sin_add]
   ring
@@ -2405,7 +2340,6 @@ lemma constructible_numbers_half_angle (M :Set ℂ ) (h0 : 0 ∈ M) (h1 : 1 ∈ 
             rw [this]
             simp
           }
-          _= 1/2* 1/ Real.cos (a/2) + 1/2*1/Real.cos (a/2) * (Real.cos (a/2)* Real.cos (a/2) - Real.sin (a/2)* Real.sin (a/2)) + 1/2*1/Real.cos (a/2) * (2*Real.sin (a/2)* Real.cos (a/2))* Complex.I := by ring
           _= 1/2* 1/ Real.cos (a/2) + 1/2*1/Real.cos (a/2) * (Real.cos (a/2)* Real.cos (a/2) - Real.sin (a/2)* Real.sin (a/2)) + 1/2 * (Real.cos (a/2) / Real.cos (a/2)) * (2*Real.sin (a/2))* Complex.I := by ring
           _= 1/2* 1/ Real.cos (a/2) + 1/2*1/Real.cos (a/2) * (Real.cos (a/2)* Real.cos (a/2) - Real.sin (a/2)* Real.sin (a/2)) + 1/2 * (Real.cos (a/2) / Real.cos (a/2) : ℝ ) * (2*Real.sin (a/2))* Complex.I := by simp
           _= 1/2* 1/ Real.cos (a/2) + 1/2*1/Real.cos (a/2) * (Real.cos (a/2)* Real.cos (a/2) - Real.sin (a/2)* Real.sin (a/2)) + Real.sin (a/2)* Complex.I := by {
@@ -2488,7 +2422,7 @@ lemma constructible_numbers_half_angle (M :Set ℂ ) (h0 : 0 ∈ M) (h1 : 1 ∈ 
       }
       exact element_line_circle_intersection_constructible M h0 h1 L C hL hC (Complex.exp (a/2 * Complex.I)) this
 }
-
+-- complex square roots arent defined in mathlib so i formulated it in the way that there exists a number s.th. its square is the given number
 lemma constructible_numbers_contain_complex_root (M : Set ℂ) (h0 : 0 ∈ M) (h1 : 1 ∈ M) (z : ℂ) (hz : z ∈ constructible_numbers M h0 h1) :
   ∃ z' ∈ constructible_numbers M h0 h1, z' * z' = z := by{
     let z' : ℂ := Real.sqrt (Complex.abs z) * Complex.exp (Complex.arg z / 2 * Complex.I)
@@ -2551,7 +2485,9 @@ lemma constructible_numbers_contain_complex_root (M : Set ℂ) (h0 : 0 ∈ M) (h
       · exact hz'
 }
 
-
+-- i used {0,1} for the subfield structure, but as all the lemma are more general we can substitute {0,1} wit any set M s.th. 0,1 ∈ M and get a subfield
+-- but not nesesarily the smallest one closed under taking squareroots
+-- For example can be used to prove that trisecting an arbitrary angle is not possible with a compass and straightedge, by using the set {0, 1, e^{i*angle} instead of {0,1}
 def constructibleNumberSubfield : Subfield ℂ :=
 { carrier := constructible_numbers ({(0 : ℂ ),(1 : ℂ )}) (by simp) (by simp)
   mul_mem' := by{
